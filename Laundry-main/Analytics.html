@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laundry Business Analytics</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <style>
+        :root { --primary: #2563eb; --expense: #dc2626; --profit: #16a34a; --bg: #f1f5f9; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #1e293b; }
+        .container { max-width: 1200px; margin: auto; display: none; } /* Hidden by default */
+        
+        /* Login Styles */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--primary); display: flex; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; width: 320px; }
+        .login-card input { width: 100%; padding: 10px; margin: 15px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; text-align: center; }
+        .btn-login { background: var(--primary); color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .btn-back-link { display: block; color: #64748b; text-decoration: none; font-size: 0.85rem; margin-top: 10px; transition: color 0.2s; }
+        .btn-back-link:hover { color: var(--primary); }
+
+        /* Dashboard Styles */
+        .header { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .btn-back-circle { 
+            background: #f1f5f9; color: #1e293b; width: 35px; height: 35px; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            text-decoration: none; font-weight: bold; transition: 0.2s;
+        }
+        .btn-back-circle:hover { background: #e2e8f0; }
+
+        .btn-group { display: flex; background: #e2e8f0; padding: 5px; border-radius: 8px; }
+        .btn-group button { border: none; padding: 8px 16px; cursor: pointer; border-radius: 6px; font-weight: 600; background: transparent; }
+        .btn-group button.active { background: white; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .card-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 10px; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .btn-add { background: var(--expense); color: white; border: none; width: 100%; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .summary-box { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .s-card { padding: 15px; border-radius: 10px; color: white; }
+        .bg-blue { background: var(--primary); }
+        .bg-red { background: var(--expense); }
+        .bg-green { background: var(--profit); }
+
+        @media (max-width: 768px) { .grid-main { grid-template-columns: 1fr; } .summary-box { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-card">
+        <h2 style="margin:0; color: var(--primary)">Mami Marie</h2>
+        <p style="font-size: 0.8rem; color: #64748b">Masukkan Password Analytics</p>
+        <input type="password" id="passInput" placeholder="Password">
+        <button class="btn-login" onclick="checkPass()">Masuk</button>
+        <p id="loginErr" style="color: red; font-size: 0.7rem; margin-top: 5px; display: none;">Password Salah!</p>
+        
+        <a href="index.html" class="btn-back-link">← Kembali ke Kasir</a>
+    </div>
+</div>
+
+<div class="container" id="mainDashboard">
+    <div class="header">
+        <div class="header-left">
+            <a href="index.html" class="btn-back-circle" title="Kembali ke Kasir">←</a>
+            <div>
+                <h2 style="margin:0">Laundry Analytics</h2>
+                <input type="file" id="fileInput" accept=".json" style="margin-top:5px; font-size: 0.8rem;">
+            </div>
+        </div>
+        <div class="btn-group">
+            <button onclick="changeMode('daily')" id="btn-daily">Harian</button>
+            <button onclick="changeMode('monthly')" id="btn-monthly" class="active">Bulanan</button>
+        </div>
+    </div>
+
+    <div id="content" style="display:none;">
+        <div class="summary-box">
+            <div class="s-card bg-blue">
+                <small>Total Pendapatan</small>
+                <div id="totalRev" style="font-size: 1.4rem; font-weight: bold;">Rp 0</div>
+            </div>
+            <div class="s-card bg-red">
+                <small>Total Pengeluaran</small>
+                <div id="totalExp" style="font-size: 1.4rem; font-weight: bold;">Rp 0</div>
+            </div>
+            <div class="s-card bg-green">
+                <small>Laba Bersih (Profit)</small>
+                <div id="totalProfit" style="font-size: 1.4rem; font-weight: bold;">Rp 0</div>
+            </div>
+        </div>
+
+        <div class="grid-main">
+            <div class="card-panel">
+                <canvas id="mainChart" style="height: 300px;"></canvas>
+            </div>
+            
+            <div class="card-panel">
+                <h3 style="margin-top:0">Input Pengeluaran</h3>
+                <div class="form-group">
+                    <label>Tanggal</label>
+                    <input type="date" id="expDate">
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="expCat">
+                        <option value="Listrik/Air">Listrik/Air</option>
+                        <option value="Sabun/Pewangi">Sabun/Pewangi</option>
+                        <option value="Gaji Karyawan">Gaji Karyawan</option>
+                        <option value="Sewa Tempat">Sewa Tempat</option>
+                        <option value="Lain-lain">Lain-lain</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nominal (Rp)</label>
+                    <input type="number" id="expAmount" placeholder="Contoh: 50000">
+                </div>
+                <button class="btn-add" onclick="addExpense()">Tambah Pengeluaran</button>
+                <hr>
+                <h4>Riwayat Pengeluaran</h4>
+                <div id="expList" style="max-height: 150px; overflow-y: auto; font-size: 0.8rem;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const MASTER_PASSWORD = "@Tomang155";
+
+    // Konfigurasi Supabase (Membaca dari config.js atau langsung di bawah ini)
+    const SUPABASE_URL = window.CONFIG_SUPABASE_URL || 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = window.CONFIG_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+    
+    let supabase = null;
+    try {
+        if (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+    } catch (e) {
+        console.error("Gagal menginisialisasi client Supabase di Analytics:", e);
+    }
+
+    async function checkPass() {
+        const input = document.getElementById('passInput').value;
+        const err = document.getElementById('loginErr');
+        if(input === MASTER_PASSWORD) {
+            document.getElementById('login-overlay').style.display = 'none';
+            document.getElementById('mainDashboard').style.display = 'block';
+            await loadDataFromSupabase(); // Pemuatan data otomatis
+        } else {
+            err.style.display = 'block';
+            document.getElementById('passInput').value = '';
+        }
+    }
+
+    async function loadDataFromSupabase() {
+        if (!supabase || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            console.log("Supabase belum terkonfigurasi. Gunakan impor manual atau isi URL & KEY.");
+            // Load local expenses as fallback
+            expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
+            return;
+        }
+        
+        try {
+            // Load orders
+            const { data: ordData, error: ordErr } = await supabase
+                .from('orders')
+                .select('*')
+                .order('id', { ascending: false });
+            
+            if (ordErr) {
+                console.error("Gagal mengambil data transaksi dari Supabase:", ordErr);
+            } else {
+                rawTransactions = ordData || [];
+            }
+            
+            // Load expenses
+            const { data: expData, error: expErr } = await supabase
+                .from('expenses')
+                .select('*')
+                .order('date', { ascending: false });
+            
+            if (expErr) {
+                console.error("Gagal mengambil data pengeluaran dari Supabase:", expErr);
+                expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
+            } else {
+                expenses = expData || [];
+            }
+            
+            document.getElementById('content').style.display = 'block';
+            renderAll();
+        } catch (err) {
+            console.error("Kesalahan koneksi database Supabase:", err);
+            expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
+        }
+    }
+
+    document.getElementById('passInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') checkPass();
+    });
+
+    let rawTransactions = [];
+    let expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
+    let currentMode = 'monthly';
+    let myChart;
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            rawTransactions = JSON.parse(e.target.result);
+            document.getElementById('content').style.display = 'block';
+            renderAll();
+        };
+        reader.readAsText(file);
+    });
+
+    async function addExpense() {
+        const date = document.getElementById('expDate').value;
+        const cat = document.getElementById('expCat').value;
+        const amount = parseInt(document.getElementById('expAmount').value);
+        if(!date || !amount) return alert("Isi tanggal dan nominal!");
+        
+        const newExpense = { date, cat, amount };
+        
+        if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+            try {
+                const { data, error } = await supabase
+                    .from('expenses')
+                    .insert([newExpense])
+                    .select();
+                
+                if (error) {
+                    console.error("Gagal menyimpan pengeluaran ke Supabase:", error);
+                    alert("Gagal menyimpan ke Cloud, menyimpan ke lokal: " + error.message);
+                    expenses.push(newExpense);
+                } else {
+                    expenses.push(data[0]);
+                }
+            } catch (err) {
+                console.error("Kesalahan koneksi saat addExpense:", err);
+                expenses.push(newExpense);
+            }
+        } else {
+            expenses.push(newExpense);
+        }
+        
+        localStorage.setItem('laundry_expenses', JSON.stringify(expenses));
+        document.getElementById('expAmount').value = '';
+        renderAll();
+    }
+
+    function changeMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.btn-group button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-' + mode).classList.add('active');
+        renderAll();
+    }
+
+    function renderAll() {
+        const grouped = {};
+        let grandTotalRev = 0;
+        let grandTotalExp = 0;
+
+        rawTransactions.forEach(trx => {
+            let key = currentMode === 'daily' ? trx.date : trx.date.substring(0, 7);
+            if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
+            if (trx.isPaid) {
+                grouped[key].rev += trx.total;
+                grandTotalRev += trx.total;
+            }
+        });
+
+        expenses.forEach(ex => {
+            let key = currentMode === 'daily' ? ex.date : ex.date.substring(0, 7);
+            if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
+            grouped[key].exp += ex.amount;
+            grandTotalExp += ex.amount;
+        });
+
+        document.getElementById('totalRev').innerText = `Rp ${grandTotalRev.toLocaleString()}`;
+        document.getElementById('totalExp').innerText = `Rp ${grandTotalExp.toLocaleString()}`;
+        document.getElementById('totalProfit').innerText = `Rp ${(grandTotalRev - grandTotalExp).toLocaleString()}`;
+
+        const listDiv = document.getElementById('expList');
+        listDiv.innerHTML = expenses.slice().reverse().map(e => `<div>${e.date} - ${e.cat}: <b>Rp ${e.amount.toLocaleString()}</b></div>`).join('');
+
+        const sortedKeys = Object.keys(grouped).sort();
+        const labels = sortedKeys;
+        const revData = sortedKeys.map(k => grouped[k].rev);
+        const expData = sortedKeys.map(k => grouped[k].exp);
+        updateChart(labels, revData, expData);
+    }
+
+    function updateChart(labels, rev, exp) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Pendapatan', data: rev, backgroundColor: '#3b82f6' },
+                    { label: 'Pengeluaran', data: exp, backgroundColor: '#dc2626' }
+                ]
+            },
+            options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+        });
+    }
+</script>
+</body>
+</html> 

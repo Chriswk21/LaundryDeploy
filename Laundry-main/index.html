@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Laundry Mami Marie</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="min-h-screen">
+
+    <div id="app" class="max-w-xl mx-auto bg-white shadow-xl min-h-screen">
+
+        <header class="p-4 shadow-md bg-blue-600 text-white rounded-b-lg flex justify-between items-center">
+    <div>
+        <h1 class="text-2xl font-extrabold">Kasir Laundry Mami Marie</h1>
+        <p id="header-status" class="text-sm mt-1 font-medium"></p>
+    </div>
+
+    <div class="flex gap-2">
+        <a href="Analytics.html" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-bold text-sm transition shadow-sm">
+            Lihat Analytics
+        </a>
+
+        
+    </div>
+</header>
+
+        <nav class="flex border-b border-gray-200 sticky top-0 bg-white z-10">
+            <button id="tab-kasir" class="flex-1 py-3 text-lg font-semibold transition duration-150 border-b-4 border-transparent hover:bg-gray-50 text-blue-600 border-blue-600">
+                Kasir Hari Ini
+            </button>
+            <button id="tab-history" class="flex-1 py-3 text-lg font-semibold text-gray-600 transition duration-150 border-b-4 border-transparent hover:bg-gray-50">
+                History Harian
+            </button>
+            <button id="tab-debt" class="flex-1 py-3 text-lg font-semibold text-gray-600 transition duration-150 border-b-4 border-transparent hover:bg-gray-50">
+                Buku Utang
+            </button>
+        </nav>
+
+        <main class="p-4">
+
+            <section id="view-kasir" class="tab-content space-y-6">
+                
+                <div class="p-4 bg-gray-100 rounded-xl shadow-inner flex justify-between gap-3">
+                    <button id="btn-start-day" class="large-button flex-1 bg-green-500 text-white hover:bg-green-600">
+                        Mulai Hari
+                    </button>
+                    <button id="btn-end-day" class="large-button flex-1 bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        Akhiri Hari
+                    </button>
+                </div>
+
+                <div id="no-active-day-message" class="text-center p-6 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded-lg">
+                    <p class="text-lg font-semibold">Belum ada hari aktif.</p>
+                    <p class="mt-1">Tekan tombol 'Mulai Hari' untuk mulai mencatat transaksi.</p>
+                </div>
+
+                <div id="nota-header-container" class="space-y-4 border p-4 rounded-xl shadow-lg bg-indigo-50">
+                    <h2 class="text-xl font-bold text-indigo-700">Header Nota</h2>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="nota" class="block text-sm font-medium text-gray-700">Nomor Nota</label>
+                            <input type="text" id="nota" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Cth: 001">
+                        </div>
+                        <div>
+                            <label for="customer" class="block text-sm font-medium text-gray-700">Nama Pelanggan</label>
+                            <input type="text" id="customer" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Boleh kosong">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="active-nota-items" class="space-y-3 p-4 border rounded-xl shadow-lg bg-white hidden">
+                    <h2 class="text-xl font-bold text-gray-700">Item di Nota (<span id="active-item-count">0</span>)</h2>
+                    <ul id="active-item-list" class="space-y-2 border-b pb-3">
+                        <li id="no-item-message" class="text-gray-500 italic text-sm">Belum ada item di nota.</li>
+                    </ul>
+
+                    <p class="flex justify-between text-xl font-extrabold pt-2">
+                        <span>TOTAL NOTA:</span>
+                        <span id="active-nota-total" class="text-red-600">Rp 0</span>
+                    </p>
+                </div>
+
+                <div id="transaction-form-container" class="space-y-4 border p-4 rounded-xl shadow-lg bg-blue-50">
+                    <h2 class="text-xl font-bold text-blue-700">Input Item/Layanan Baru</h2>
+
+                    <div>
+                        <label for="service" class="block text-sm font-medium text-gray-700">Jenis Layanan</label>
+                        <select id="service" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="Cuci Kering Lipat">Cuci Kering Lipat (Tiered)</option>
+                            <option value="Cuci Kering Setrika">Cuci Kering Setrika (Tiered)</option>
+                            <option value="Cuci Saja">Cuci Saja (Rp 4rb/kg - Min 5.5kg)</option>
+                            <option value="Setrika Saja">Setrika Saja (Rp 6rb/kg)</option>
+                            <option value="Boneka/Tas">Boneka/Tas (Satuan, Tiered Ukuran)</option>
+                            <option value="Selimut">Selimut (Satuan)</option>
+                            <option value="Bed Cover Matras">Bed Cover/Matras (Satuan)</option>
+                        </select>
+                    </div>
+
+                    <div id="kiloan-inputs" class="grid grid-cols-3 gap-3">
+                        <div class="col-span-1">
+                            <label for="weight" class="block text-sm font-medium text-gray-700">Berat (kg)</label>
+                            <input type="number" step="0.1" id="weight" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Cth: 3.5">
+                        </div>
+                        <div class="col-span-2">
+                            <label for="pricePerKg" class="block text-sm font-medium text-gray-700">Harga/kg (Override)</label>
+                            <input type="number" id="pricePerKg" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    
+                    <div id="satuan-inputs" class="grid grid-cols-3 gap-3 hidden">
+                        <div class="col-span-1">
+                            <label for="qty" class="block text-sm font-medium text-gray-700">Jumlah (pc)</label>
+                            <input type="number" id="qty" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Cth: 2">
+                        </div>
+                        <div class="col-span-2">
+                            <label for="size" class="block text-sm font-medium text-gray-700">Ukuran</label>
+                            <select id="size" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-yellow-100 rounded-lg border border-yellow-300">
+                        <p class="text-lg font-bold text-yellow-800 flex justify-between">
+                            <span>TOTAL ITEM:</span>
+                            <span id="calculated-total">Rp 0</span>
+                        </p>
+                    </div>
+                    
+                    <button id="btn-add-item" class="large-button w-full bg-blue-600 text-white hover:bg-blue-700">
+                        Tambahkan Item ke Nota
+                    </button>
+                </div>
+
+                <div id="save-nota-container" class="space-y-3 p-4 border rounded-xl shadow-lg bg-green-50 hidden">
+                    <h2 class="text-xl font-bold text-green-700">Selesaikan Nota</h2>
+
+                    <div class="space-y-2 p-3 bg-white rounded-lg border">
+                        <label for="nota-notes" class="block text-sm font-medium text-gray-700">Keterangan/Catatan Tambahan (Opsional)</label>
+                        <textarea id="nota-notes" rows="2" class="large-input w-full border-gray-300 focus:border-green-500 focus:ring-green-500" placeholder="Cth: Ada baju yang luntur, request diambil besok sore."></textarea>
+                    </div>
+
+                    <div class="space-y-3 p-3 bg-white rounded-lg border">
+                        <label class="block text-sm font-medium text-gray-700">Metode Pembayaran</label>
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center space-x-2 text-base font-semibold">
+                                <input type="radio" name="paymentMethod" value="CASH" checked class="form-radio text-blue-600 h-5 w-5">
+                                <span>CASH</span>
+                            </label>
+                            <label class="flex items-center space-x-2 text-base font-semibold">
+                                <input type="radio" name="paymentMethod" value="QRIS" class="form-radio text-blue-600 h-5 w-5">
+                                <span>QRIS</span>
+                            </label>
+                            <label class="flex items-center space-x-2 text-base font-semibold">
+                                <input type="radio" name="paymentMethod" value="TRANSFER" class="form-radio text-blue-600 h-5 w-5">
+                                <span>TRANSFER</span>
+                            </label>
+                        </div>
+
+                        <label class="flex items-center space-x-2 mt-2 font-semibold text-lg text-green-700">
+                            <input type="checkbox" id="isPaid" checked class="form-checkbox h-6 w-6 text-green-600 rounded">
+                            <span>Sudah Bayar / Lunas</span>
+                        </label>
+                    </div>
+                    
+                    <button id="btn-save-nota" class="large-button w-full bg-green-600 text-white hover:bg-green-700">
+                        SIMPAN NOTA (<span id="save-nota-display-total">Rp 0</span>)
+                    </button>
+                    <button id="btn-cancel-nota" class="large-button w-full bg-red-400 text-white hover:bg-red-500">
+                        BATALKAN NOTA
+                    </button>
+                </div>
+
+                <div id="recap-container" class="space-y-2 p-4 bg-indigo-50 rounded-xl shadow-lg border border-indigo-200">
+                    <h2 class="text-xl font-bold text-indigo-700 border-b pb-2 mb-3">Rekap Hari Ini (<span id="recap-date"></span>)</h2>
+                    <p class="flex justify-between text-base font-medium">
+                        <span class="text-gray-600">Jumlah Nota Hari Ini:</span>
+                        <span id="recap-total-tx" class="font-bold text-indigo-700">0</span>
+                    </p>
+                    
+                    <div class="border-t border-indigo-200 pt-2 space-y-1">
+                        <h3 class="font-bold text-sm text-indigo-700 pt-1">Pemasukan Normal (Nota Dibuat Hari Ini)</h3>
+                        <p class="flex justify-between text-sm">
+                            <span class="text-gray-500 pl-4">Lunas CASH:</span>
+                            <span id="recap-cash" class="font-semibold text-green-600">Rp 0</span>
+                        </p>
+                        <p class="flex justify-between text-sm">
+                            <span class="text-gray-500 pl-4">Lunas QRIS:</span>
+                            <span id="recap-qris" class="font-semibold text-green-600">Rp 0</span>
+                        </p>
+                        <p class="flex justify-between text-sm">
+                            <span class="text-gray-500 pl-4">Lunas TRANSFER:</span>
+                            <span id="recap-transfer" class="font-semibold text-green-600">Rp 0</span>
+                        </p>
+                    </div>
+                    
+                    <div class="border-t border-indigo-200 pt-2 space-y-1">
+                        <h3 class="font-bold text-sm text-purple-700 pt-1">Pemasukan Pelunasan Utang (Nota Lama)</h3>
+                        <p class="flex justify-between text-base font-bold">
+                            <span class="text-gray-800">TOTAL BAYAR UTANG:</span>
+                            <span id="recap-debt-payment-total" class="font-bold text-purple-700">Rp 0</span>
+                        </p>
+                        <ul id="recap-debt-payment-list" class="list-disc ml-6 text-xs text-gray-600 italic">
+                        </ul>
+                    </div>
+                    
+                    <p class="flex justify-between text-lg font-extrabold pt-2 border-t border-indigo-300">
+                        <span class="text-indigo-800">TOTAL KAS HARI INI:</span>
+                        <span id="recap-total-all" class="text-indigo-800">Rp 0</span>
+                    </p>
+                    
+                    <div class="border-t border-indigo-200 pt-3 space-y-1 text-sm">
+                        <p class="flex justify-between">
+                            <span class="text-gray-600">Belum Bayar (Nota Hari Ini):</span>
+                            <span id="recap-unpaid" class="font-semibold text-red-500">0 Nota</span>
+                        </p>
+                        <p class="flex justify-between text-base font-bold">
+                            <span class="text-gray-800">Total Belum Lunas:</span>
+                            <span id="recap-unpaid-amount" class="font-bold text-red-600">Rp 0</span> 
+                        </p>
+                    </div>
+                </div>
+
+                <div id="transaction-list-container">
+                    <h2 class="text-xl font-bold text-gray-700 mb-3">Daftar Nota Hari Ini (<span id="list-count">0</span>)</h2>
+                    <ul id="transaction-list" class="space-y-3">
+                    </ul>
+                </div>
+            </section>
+
+            <section id="view-history" class="tab-content hidden space-y-6">
+                <div id="history-list-view">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-700">Daftar History Harian</h2>
+                    
+                    <div class="p-4 bg-gray-50 rounded-xl shadow-inner mb-4 space-y-3">
+                        <h3 class="text-lg font-bold text-gray-700 border-b pb-2">Manajemen Data Lokal</h3>
+                        <div class="flex gap-3">
+                            <button id="btn-export-data" class="large-button flex-1 bg-purple-500 text-white hover:bg-purple-600 text-sm">
+                                ⬇️ Download Semua History
+                            </button>
+                            <label for="file-import" class="large-button flex-1 bg-orange-500 text-white hover:bg-orange-600 text-sm text-center cursor-pointer">
+                                ⬆️ Masukkan Data History
+                            </label>
+                            <input type="file" id="file-import" accept=".json" class="hidden">
+                        </div>
+                        <p class="text-xs text-gray-600">JANGAN LUPA DOWNLOAD DATA SETIAP MALAM</p>
+                    </div>
+
+                    <ul id="history-day-list" class="space-y-4">
+                        <div id="no-history-message-container" class="text-center p-6 text-purple-800 rounded-lg" style="display:none;">
+                            <p id="no-history-message" class="text-lg font-semibold italic">Belum ada history transaksi yang tersimpan.</p>
+                        </div>
+                    </ul>
+                </div>
+                
+                <div id="history-detail-view" class="hidden">
+                    <button id="btn-back-history" class="large-button bg-gray-500 text-white mb-4 hover:bg-gray-600 text-sm">
+                        ← Kembali ke Daftar History
+                    </button>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-700" id="detail-history-title">Detail Transaksi: </h2>
+                        <button id="btn-delete-history-day" class="text-red-500 hover:text-red-700 text-sm font-medium">
+                            Hapus Hari Ini
+                        </button>
+                    </div>
+                    
+                    <div id="detail-recap-container" class="space-y-2 p-4 bg-purple-50 rounded-xl shadow-lg border border-purple-200">
+                        <h3 class="text-xl font-bold text-purple-700 border-b pb-2 mb-3">Rekap Detail History: <span id="detail-recap-date"></span></h3>
+                        <p class="flex justify-between text-base font-medium">
+                            <span class="text-gray-600">Jumlah Nota Dibuat:</span>
+                            <span id="detail-recap-total-tx" class="font-bold text-purple-700">0</span>
+                        </p>
+                        <div class="border-t border-purple-200 pt-2 space-y-1">
+                            <h3 class="font-bold text-sm text-purple-700 pt-1">Pemasukan Normal (Lunas di Hari Nota Dibuat)</h3>
+                            <p class="flex justify-between text-sm">
+                                <span class="text-gray-500 pl-4">Lunas CASH:</span>
+                                <span id="detail-recap-cash" class="font-semibold text-green-600">Rp 0</span>
+                            </p>
+                            <p class="flex justify-between text-sm">
+                                <span class="text-gray-500 pl-4">Lunas QRIS:</span>
+                                <span id="detail-recap-qris" class="font-semibold text-green-600">Rp 0</span>
+                            </p>
+                            <p class="flex justify-between text-sm">
+                                <span class="text-gray-500 pl-4">Lunas TRANSFER:</span>
+                                <span id="detail-recap-transfer" class="font-semibold text-green-600">Rp 0</span>
+                            </p>
+                        </div>
+                        
+                        <div class="border-t border-purple-200 pt-2 space-y-1">
+                            <h3 class="font-bold text-sm text-pink-700 pt-1">Pelunasan Utang Lintas Hari (Dibayar di Tanggal Lain)</h3>
+                            <p class="flex justify-between text-base font-bold">
+                                <span class="text-gray-800">TOTAL UTANG DILUNASI:</span>
+                                <span id="detail-recap-debt-payment-total" class="font-bold text-pink-700">Rp 0</span>
+                            </p>
+                            <ul id="detail-recap-debt-payment-list" class="list-disc ml-6 text-xs text-gray-600 italic">
+                            </ul>
+                        </div>
+                        
+                        <p class="flex justify-between text-lg font-extrabold pt-2 border-t border-purple-300">
+                            <span class="text-purple-800">TOTAL PEMASUKAN HARI INI:</span>
+                            <span id="detail-recap-total-all" class="text-purple-800">Rp 0</span>
+                        </p>
+                        
+                        <div class="border-t border-purple-200 pt-3 space-y-1 text-sm">
+                            <p class="flex justify-between">
+                                <span class="text-gray-600">Belum Bayar (Nota Hari Ini):</span>
+                                <span id="detail-recap-unpaid" class="font-semibold text-red-500">0 Nota</span>
+                            </p>
+                            <p class="flex justify-between text-base font-bold">
+                                <span class="text-gray-800">Total Nilai Piutang Aktif:</span>
+                                <span id="detail-recap-unpaid-amount" class="font-bold text-red-600">Rp 0</span> 
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6">
+                        <h3 class="text-xl font-bold text-gray-700 mb-3">Daftar Nota Dibuat Hari Ini</h3>
+                        <ul id="history-transaction-list" class="space-y-3">
+                        </ul>
+                    </div>
+                </div>
+            </section>
+            <section id="view-debt" class="tab-content hidden space-y-6">
+                <div class="mt-4 relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <input type="text" id="search-debt" 
+                        class="large-input w-full pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500 shadow-sm" 
+                        placeholder="Cari Nama Pelanggan atau No. Nota...">
+                </div>
+                <div class="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm">
+                    <h2 class="text-2xl font-bold text-red-700">Buku Utang (Piutang)</h2>
+                    <p class="text-sm text-red-600 italic">Daftar semua nota dari seluruh history yang belum dilunasi.</p>
+                </div>
+
+                <div class="p-4 bg-white border border-red-100 rounded-xl shadow-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold">Total Piutang Global</p>
+                            <p id="total-piutang-global" class="text-2xl font-black text-red-600">Rp 0</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500 uppercase font-bold">Jumlah Nota</p>
+                            <p id="total-nota-piutang" class="text-2xl font-black text-gray-800">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <ul id="debt-transaction-list" class="space-y-4">
+                    <div id="no-debt-message-container" class="text-center p-6 text-red-800 rounded-lg" style="display:none;">
+                        <p class="text-lg font-semibold italic">Semua nota sudah lunas!</p>
+                    </div>
+                </ul>
+            </section>           
+        </main>
+    </div>
+
+    <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <h3 id="modal-title" class="text-xl font-bold text-gray-800">Notifikasi</h3>
+            <p id="modal-message" class="text-gray-700"></p>
+            <div id="modal-buttons" class="flex justify-end gap-3">
+                <button id="modal-cancel" class="py-2 px-4 large-button bg-gray-300 text-gray-800 hover:bg-gray-400 text-base">Batal</button>
+                <button id="modal-confirm" class="py-2 px-4 large-button bg-blue-600 text-white hover:bg-blue-700 text-base">Ya</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="pay-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+            <h3 class="text-xl font-bold text-gray-800">Pelunasan Nota</h3>
+            <p class="text-gray-700" id="pay-modal-message">Pilih metode pembayaran untuk melunasi nota:</p>
+            <p class="text-2xl font-extrabold text-red-600" id="pay-modal-total"></p>
+            
+            <div class="space-y-3 p-3 bg-gray-50 rounded-lg border">
+                <label class="block text-sm font-medium text-gray-700">Metode Pelunasan</label>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center space-x-2 text-base font-semibold">
+                        <input type="radio" name="payMethod" value="CASH" checked class="form-radio text-green-600 h-5 w-5">
+                        <span>CASH</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-base font-semibold">
+                        <input type="radio" name="payMethod" value="QRIS" class="form-radio text-green-600 h-5 w-5">
+                        <span>QRIS</span>
+                    </label>
+                    <label class="flex items-center space-x-2 text-base font-semibold">
+                        <input type="radio" name="payMethod" value="TRANSFER" class="form-radio text-green-600 h-5 w-5">
+                        <span>TRANSFER</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between gap-3">
+                <button id="pay-modal-cancel" class="py-2 px-4 large-button flex-1 bg-gray-300 text-gray-800 hover:bg-gray-400 text-base">Batal</button>
+                <button id="pay-modal-confirm" data-txid="" class="py-2 px-4 large-button flex-1 bg-green-600 text-white hover:bg-green-700 text-base">Lunasi Sekarang</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notes-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <h3 class="text-xl font-bold text-gray-800">Edit Catatan Nota</h3>
+            <p class="text-gray-700" id="notes-modal-message">Catatan untuk Nota #<span id="notes-modal-nota-id"></span> (<span id="notes-modal-nota-customer"></span>)</p>
+            
+            <textarea id="notes-modal-textarea" rows="4" class="large-input w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500" placeholder="Masukkan catatan baru atau edit catatan yang sudah ada."></textarea>
+
+            <div class="flex justify-end gap-3">
+                <button id="notes-modal-cancel" class="py-2 px-4 large-button bg-gray-300 text-gray-800 hover:bg-gray-400 text-base">Batal</button>
+                <button id="notes-modal-save" data-txid="" class="py-2 px-4 large-button bg-blue-600 text-white hover:bg-blue-700 text-base">Simpan Catatan</button>
+            </div>
+        </div>
+    </div>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+
