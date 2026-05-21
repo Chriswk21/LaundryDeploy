@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laundry Business Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabaseClient/supabaseClient-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <style>
         :root { --primary: #2563eb; --expense: #dc2626; --profit: #16a34a; --bg: #f1f5f9; }
@@ -167,29 +167,79 @@
         }
         
         try {
-            // Load orders
-            const { data: ordData, error: ordErr } = await supabaseClient
-                .from('orders')
-                .select('*')
-                .order('id', { ascending: false });
-            
-            if (ordErr) {
-                console.error("Gagal mengambil data transaksi dari supabaseClient:", ordErr);
+            // Load all orders with pagination
+            let allOrders = [];
+            let ordersFrom = 0;
+            const ordersLimit = 1000;
+            let ordersHasMore = true;
+            let ordersError = null;
+
+            while (ordersHasMore) {
+                const { data, error } = await supabaseClient
+                    .from('orders')
+                    .select('*')
+                    .range(ordersFrom, ordersFrom + ordersLimit - 1)
+                    .order('id', { ascending: false });
+                
+                if (error) {
+                    ordersError = error;
+                    break;
+                }
+                
+                if (data && data.length > 0) {
+                    allOrders = allOrders.concat(data);
+                    if (data.length < ordersLimit) {
+                        ordersHasMore = false;
+                    } else {
+                        ordersFrom += ordersLimit;
+                    }
+                } else {
+                    ordersHasMore = false;
+                }
+            }
+
+            if (ordersError) {
+                console.error("Gagal mengambil data transaksi dari supabaseClient:", ordersError);
             } else {
-                rawTransactions = ordData || [];
+                rawTransactions = allOrders;
             }
             
-            // Load expenses
-            const { data: expData, error: expErr } = await supabaseClient
-                .from('expenses')
-                .select('*')
-                .order('date', { ascending: false });
-            
-            if (expErr) {
-                console.error("Gagal mengambil data pengeluaran dari supabaseClient:", expErr);
+            // Load all expenses with pagination
+            let allExpenses = [];
+            let expensesFrom = 0;
+            const expensesLimit = 1000;
+            let expensesHasMore = true;
+            let expensesError = null;
+
+            while (expensesHasMore) {
+                const { data, error } = await supabaseClient
+                    .from('expenses')
+                    .select('*')
+                    .range(expensesFrom, expensesFrom + expensesLimit - 1)
+                    .order('date', { ascending: false });
+                
+                if (error) {
+                    expensesError = error;
+                    break;
+                }
+                
+                if (data && data.length > 0) {
+                    allExpenses = allExpenses.concat(data);
+                    if (data.length < expensesLimit) {
+                        expensesHasMore = false;
+                    } else {
+                        expensesFrom += expensesLimit;
+                    }
+                } else {
+                    expensesHasMore = false;
+                }
+            }
+
+            if (expensesError) {
+                console.error("Gagal mengambil data pengeluaran dari supabaseClient:", expensesError);
                 expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
             } else {
-                expenses = expData || [];
+                expenses = allExpenses;
             }
             
             document.getElementById('content').style.display = 'block';

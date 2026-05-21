@@ -149,17 +149,42 @@
             // Pemuatan data transaksi utama dari database supabaseClient
             if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                 try {
-                    const { data, error } = await supabaseClient
-                        .from('orders')
-                        .select('*')
-                        .order('id', { ascending: false });
+                    let allOrders = [];
+                    let from = 0;
+                    const limit = 1000;
+                    let hasMore = true;
+                    let fetchError = null;
+
+                    while (hasMore) {
+                        const { data, error } = await supabaseClient
+                            .from('orders')
+                            .select('*')
+                            .range(from, from + limit - 1)
+                            .order('id', { ascending: false });
+                        
+                        if (error) {
+                            fetchError = error;
+                            break;
+                        }
+
+                        if (data && data.length > 0) {
+                            allOrders = allOrders.concat(data);
+                            if (data.length < limit) {
+                                hasMore = false;
+                            } else {
+                                from += limit;
+                            }
+                        } else {
+                            hasMore = false;
+                        }
+                    }
                     
-                    if (error) {
-                        console.error("Gagal mengambil data dari supabaseClient, memuat dari localStorage:", error);
+                    if (fetchError) {
+                        console.error("Gagal mengambil data dari supabaseClient, memuat dari localStorage:", fetchError);
                         const storedOrders = localStorage.getItem(STORAGE_ORDERS_KEY);
                         orders = storedOrders ? JSON.parse(storedOrders) : [];
                     } else {
-                        orders = data || [];
+                        orders = allOrders;
                     }
                 } catch (err) {
                     console.error("Kesalahan koneksi supabaseClient, memuat dari localStorage:", err);
