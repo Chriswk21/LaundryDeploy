@@ -254,10 +254,40 @@
         if (e.key === 'Enter') checkPass();
     });
 
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        const expDateInput = document.getElementById('expDate');
+        if (expDateInput) expDateInput.value = todayStr;
+    });
+
     let rawTransactions = [];
     let expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
     let currentMode = 'monthly';
     let myChart;
+
+    function getDateFromDateTimeString(dateTimeString) {
+        return dateTimeString ? dateTimeString.split(' ')[0] : null;
+    }
+
+    function sanitizeTransactions(txs) {
+        if (!Array.isArray(txs)) return [];
+        return txs.map(tx => {
+            const sanitizedTx = {
+                ...tx,
+                paymentHistory: tx.paymentHistory || [],
+                paidInDay: tx.paidInDay || (tx.isPaid && tx.paidAt ? getDateFromDateTimeString(tx.paidAt) : null)
+            };
+            sanitizedTx.paymentHistory = sanitizedTx.paymentHistory.map(ph => ({
+                ...ph,
+                paidInDay: ph.paidInDay || getDateFromDateTimeString(ph.paidAt)
+            }));
+            return sanitizedTx;
+        });
+    }
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -318,16 +348,32 @@
         let grandTotalRev = 0;
         let grandTotalExp = 0;
 
-        rawTransactions.forEach(trx => {
-            let key = currentMode === 'daily' ? trx.date : trx.date.substring(0, 7);
-            if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
-            if (trx.isPaid) {
+        // Sanitize raw transactions to ensure correct paymentHistory and paidInDay fields
+        const sanitized = sanitizeTransactions(rawTransactions);
+
+        sanitized.forEach(trx => {
+            // Process revenue based on cash flow (actual payment dates)
+            if (trx.paymentHistory && trx.paymentHistory.length > 0) {
+                trx.paymentHistory.forEach(payment => {
+                    const payDate = payment.paidInDay;
+                    if (!payDate) return;
+                    let key = currentMode === 'daily' ? payDate : payDate.substring(0, 7);
+                    if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
+                    grouped[key].rev += payment.amount;
+                    grandTotalRev += payment.amount;
+                });
+            } else if (trx.isPaid) {
+                const payDate = trx.paidInDay || trx.date;
+                if (!payDate) return;
+                let key = currentMode === 'daily' ? payDate : payDate.substring(0, 7);
+                if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
                 grouped[key].rev += trx.total;
                 grandTotalRev += trx.total;
             }
         });
 
         expenses.forEach(ex => {
+            if (!ex.date) return;
             let key = currentMode === 'daily' ? ex.date : ex.date.substring(0, 7);
             if (!grouped[key]) grouped[key] = { rev: 0, exp: 0 };
             grouped[key].exp += ex.amount;

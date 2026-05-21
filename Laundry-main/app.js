@@ -106,6 +106,12 @@
         let currentView = 'kasir';
         let currentHistoryDate = null;
 
+        // History filtering state
+        let historyFilterType = 'all'; // 'all', '7days', 'month', 'select-month', 'custom'
+        let historySelectedMonth = ''; // 'YYYY-MM'
+        let historyStartDate = ''; // 'YYYY-MM-DD'
+        let historyEndDate = ''; // 'YYYY-MM-DD'
+
         function getCurrentDateTimeString() {
             const now = new Date();
             const date = now.toISOString().slice(0, 10);
@@ -118,6 +124,13 @@
             const year = today.getFullYear();
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatDateToString(d) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
         }
         
@@ -320,7 +333,7 @@
             notesModal.classList.add('flex');
         }
 
-        function saveEditedNotes(e) {
+        async function saveEditedNotes(e) {
             const notesModal = document.getElementById('notes-modal');
             const notaId = parseInt(e.currentTarget.dataset.txid);
             const newNotes = document.getElementById('notes-modal-textarea').value.trim();
@@ -329,6 +342,23 @@
 
             if (txIndex !== -1) {
                 orders[txIndex].notes = newNotes;
+                
+                // Update ke supabaseClient
+                if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                    try {
+                        const { error } = await supabaseClient
+                            .from('orders')
+                            .update({ notes: newNotes })
+                            .eq('id', notaId);
+                        
+                        if (error) {
+                            console.error("Gagal update catatan nota di supabaseClient:", error);
+                        }
+                    } catch (err) {
+                        console.error("Kesalahan koneksi supabaseClient saat update catatan nota:", err);
+                    }
+                }
+
                 saveData();
 
                 notesModal.classList.add('hidden');
@@ -1423,6 +1453,69 @@
             reader.readAsText(file);
         }
 
+        function formatMonthIndonesian(monthStr) {
+            if (!monthStr || !monthStr.includes('-')) return monthStr;
+            const [year, month] = monthStr.split('-');
+            const monthsIndo = [
+                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ];
+            const monthIdx = parseInt(month, 10) - 1;
+            return (monthIdx >= 0 && monthIdx < 12) ? `${monthsIndo[monthIdx]} ${year}` : monthStr;
+        }
+
+        function updateFilterUI() {
+            // Remove active classes from all filter buttons
+            document.querySelectorAll('.history-filter-btn').forEach(btn => {
+                btn.className = 'history-filter-btn py-2 text-xs font-bold rounded-lg transition duration-200 text-gray-600 hover:bg-gray-50';
+            });
+            
+            // Add active class to selected button
+            const activeBtn = document.getElementById(`btn-filter-${historyFilterType}`);
+            if (activeBtn) {
+                activeBtn.className = 'history-filter-btn py-2 text-xs font-bold rounded-lg transition duration-200 bg-blue-600 text-white shadow-sm';
+            }
+
+            // Show/hide containers
+            const monthContainer = document.getElementById('filter-month-container');
+            const customContainer = document.getElementById('filter-custom-container');
+            const activeIndicator = document.getElementById('history-filter-active-indicator');
+            
+            if (monthContainer) {
+                if (historyFilterType === 'select-month') {
+                    monthContainer.classList.remove('hidden');
+                } else {
+                    monthContainer.classList.add('hidden');
+                }
+            }
+            
+            if (customContainer) {
+                if (historyFilterType === 'custom') {
+                    customContainer.classList.remove('hidden');
+                    customContainer.classList.add('grid');
+                } else {
+                    customContainer.classList.add('hidden');
+                    customContainer.classList.remove('grid');
+                }
+            }
+
+            if (activeIndicator) {
+                let indicatorText = 'Semua Data';
+                if (historyFilterType === '7days') {
+                    indicatorText = '7 Hari Terakhir';
+                } else if (historyFilterType === 'month') {
+                    indicatorText = 'Bulan Ini';
+                } else if (historyFilterType === 'select-month') {
+                    indicatorText = historySelectedMonth ? formatMonthIndonesian(historySelectedMonth) : 'Pilih Bulan';
+                } else if (historyFilterType === 'custom') {
+                    const startDisp = historyStartDate ? historyStartDate : '...';
+                    const endDisp = historyEndDate ? historyEndDate : '...';
+                    indicatorText = `${startDisp} s/d ${endDisp}`;
+                }
+                activeIndicator.textContent = indicatorText;
+            }
+        }
+
         function renderHistoryList() {
             const historyDayList = document.getElementById('history-day-list');
             const noHistoryMessageContainer = document.getElementById('no-history-message-container');
@@ -1445,13 +1538,80 @@
 
             const sortedDates = Array.from(allInvolvedDates).sort().reverse(); 
             
+            // Populate Month Dropdown dynamically
+            const uniqueMonths = new Set();
+            sortedDates.forEach(dateStr => {
+                if (dateStr && dateStr.length >= 7) {
+                    uniqueMonths.add(dateStr.slice(0, 7)); // YYYY-MM
+                }
+            });
+
+            const dropdown = document.getElementById('history-month-dropdown');
+            if (dropdown) {
+                const currentSelected = dropdown.value;
+                dropdown.innerHTML = '<option value="">-- Pilih Bulan --</option>';
+                Array.from(uniqueMonths).sort().reverse().forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = formatMonthIndonesian(m);
+                    dropdown.appendChild(opt);
+                });
+                
+                // Restore selection if it exists in the new options
+                if (uniqueMonths.has(currentSelected)) {
+                    dropdown.value = currentSelected;
+                } else if (historySelectedMonth && uniqueMonths.has(historySelectedMonth)) {
+                    dropdown.value = historySelectedMonth;
+                } else {
+                    historySelectedMonth = dropdown.value;
+                }
+            }
+
             if (sortedDates.length === 0) {
                 noHistoryMessageContainer.style.display = 'block';
+                const msgEl = document.getElementById('no-history-message');
+                if (msgEl) msgEl.textContent = 'Belum ada history transaksi yang tersimpan.';
+                return;
+            }
+
+            // Apply filters to sortedDates
+            let filteredDates = [...sortedDates];
+            if (historyFilterType === '7days') {
+                const todayDate = new Date();
+                const limitDate = new Date();
+                limitDate.setDate(todayDate.getDate() - 6);
+                const limitStr = formatDateToString(limitDate);
+                filteredDates = sortedDates.filter(d => d >= limitStr);
+            } else if (historyFilterType === 'month') {
+                const todayStr = getTodayDateString();
+                const currentMonthStr = todayStr.slice(0, 7);
+                filteredDates = sortedDates.filter(d => d.startsWith(currentMonthStr));
+            } else if (historyFilterType === 'select-month') {
+                if (historySelectedMonth) {
+                    filteredDates = sortedDates.filter(d => d.startsWith(historySelectedMonth));
+                } else {
+                    filteredDates = [];
+                }
+            } else if (historyFilterType === 'custom') {
+                filteredDates = sortedDates.filter(d => {
+                    let keep = true;
+                    if (historyStartDate) keep = keep && (d >= historyStartDate);
+                    if (historyEndDate) keep = keep && (d <= historyEndDate);
+                    return keep;
+                });
+            }
+
+            if (filteredDates.length === 0) {
+                noHistoryMessageContainer.style.display = 'block';
+                const msgEl = document.getElementById('no-history-message');
+                if (msgEl) {
+                    msgEl.textContent = 'Tidak ada history transaksi pada periode filter terpilih.';
+                }
                 return;
             }
             noHistoryMessageContainer.style.display = 'none';
 
-            sortedDates.forEach(date => {
+            filteredDates.forEach(date => {
                 const recap = calculateRecap(orders, date); 
                 
                 const dayOrdersCreated = orders.filter(tx => tx.date === date).length;
@@ -1595,8 +1755,9 @@
 
             // 2. Filter berdasarkan search untuk daftar di bawahnya
             const filteredOrders = allUnpaid.filter(tx => {
-                return tx.customer.toLowerCase().includes(searchQuery) || 
-                    (tx.nota && tx.nota.toLowerCase().includes(searchQuery));
+                const customerName = tx.customer ? String(tx.customer).toLowerCase() : "";
+                const notaNum = tx.nota ? String(tx.nota).toLowerCase() : "";
+                return customerName.includes(searchQuery) || notaNum.includes(searchQuery);
             }).sort((a, b) => new Date(a.date) - new Date(b.date));
 
             if (filteredOrders.length === 0) {
@@ -1694,6 +1855,51 @@
                 switchView('debt');
             });
             document.getElementById('search-debt').addEventListener('input', renderDebtBook);
+
+            // History Filtering event listeners
+            document.getElementById('btn-filter-all').addEventListener('click', () => {
+                historyFilterType = 'all';
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('btn-filter-7days').addEventListener('click', () => {
+                historyFilterType = '7days';
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('btn-filter-month').addEventListener('click', () => {
+                historyFilterType = 'month';
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('btn-filter-select-month').addEventListener('click', () => {
+                historyFilterType = 'select-month';
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('btn-filter-custom').addEventListener('click', () => {
+                historyFilterType = 'custom';
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('history-month-dropdown').addEventListener('change', (e) => {
+                historySelectedMonth = e.target.value;
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('history-start-date').addEventListener('change', (e) => {
+                historyStartDate = e.target.value;
+                updateFilterUI();
+                renderHistoryList();
+            });
+            document.getElementById('history-end-date').addEventListener('change', (e) => {
+                historyEndDate = e.target.value;
+                updateFilterUI();
+                renderHistoryList();
+            });
+
+            // Initialize Filter UI
+            updateFilterUI();
             
         });
     
