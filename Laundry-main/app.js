@@ -2,17 +2,17 @@
         const STORAGE_ACTIVE_DAY_KEY = 'laundry_mami_active_day_multi';
         const STORAGE_ACTIVE_NOTA_KEY = 'laundry_mami_active_nota';
 
-        // Konfigurasi Supabase (Membaca dari config.js atau langsung di bawah ini)
+        // Konfigurasi supabaseClient (Membaca dari config.js atau langsung di bawah ini)
         const SUPABASE_URL = window.CONFIG_SUPABASE_URL || 'YOUR_SUPABASE_URL';
         const SUPABASE_ANON_KEY = window.CONFIG_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
         
-        let supabase = null;
+        let supabaseClient = null;
         try {
             if (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             }
         } catch (e) {
-            console.error("Gagal menginisialisasi client Supabase:", e);
+            console.error("Gagal menginisialisasi client supabaseClient:", e);
         }
 
         const PRICE_DATA = {
@@ -146,28 +146,28 @@
             }
             activeDay = localStorage.getItem(STORAGE_ACTIVE_DAY_KEY) || null;
 
-            // Pemuatan data transaksi utama dari database Supabase
-            if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+            // Pemuatan data transaksi utama dari database supabaseClient
+            if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                 try {
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('orders')
                         .select('*')
                         .order('id', { ascending: false });
                     
                     if (error) {
-                        console.error("Gagal mengambil data dari Supabase, memuat dari localStorage:", error);
+                        console.error("Gagal mengambil data dari supabaseClient, memuat dari localStorage:", error);
                         const storedOrders = localStorage.getItem(STORAGE_ORDERS_KEY);
                         orders = storedOrders ? JSON.parse(storedOrders) : [];
                     } else {
                         orders = data || [];
                     }
                 } catch (err) {
-                    console.error("Kesalahan koneksi Supabase, memuat dari localStorage:", err);
+                    console.error("Kesalahan koneksi supabaseClient, memuat dari localStorage:", err);
                     const storedOrders = localStorage.getItem(STORAGE_ORDERS_KEY);
                     orders = storedOrders ? JSON.parse(storedOrders) : [];
                 }
             } else {
-                // Fallback jika Supabase belum dikonfigurasi
+                // Fallback jika supabaseClient belum dikonfigurasi
                 const storedOrders = localStorage.getItem(STORAGE_ORDERS_KEY);
                 orders = storedOrders ? JSON.parse(storedOrders) : [];
             }
@@ -979,19 +979,19 @@
 
             orders.unshift(finalNota);
             
-            // Simpan ke Supabase jika tersedia
-            if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+            // Simpan ke supabaseClient jika tersedia
+            if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                 try {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('orders')
                         .insert([finalNota]);
                     
                     if (error) {
-                        console.error("Gagal menyimpan ke Supabase:", error);
+                        console.error("Gagal menyimpan ke supabaseClient:", error);
                         customModal("Peringatan", "Nota tersimpan lokal, tapi gagal dikirim ke Cloud: " + error.message, false, "OK");
                     }
                 } catch (err) {
-                    console.error("Kesalahan koneksi Supabase saat insert:", err);
+                    console.error("Kesalahan koneksi supabaseClient saat insert:", err);
                     customModal("Peringatan", "Nota tersimpan lokal, koneksi database terputus.", false, "OK");
                 }
             }
@@ -1059,10 +1059,10 @@
                 tx.paidAt = paidTime;
                 tx.paidInDay = paidDate; 
                 
-                // Update ke Supabase
-                if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                // Update ke supabaseClient
+                if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                     try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                             .from('orders')
                             .update({
                                 isPaid: tx.isPaid,
@@ -1074,11 +1074,11 @@
                             .eq('id', tx.id);
                         
                         if (error) {
-                            console.error("Gagal sinkronisasi pembayaran ke Supabase:", error);
+                            console.error("Gagal sinkronisasi pembayaran ke supabaseClient:", error);
                             customModal("Peringatan", "Pelunasan berhasil disimpan lokal, namun gagal sinkronisasi ke Cloud: " + error.message, false, "OK");
                         }
                     } catch (err) {
-                        console.error("Kesalahan koneksi Supabase saat update pembayaran:", err);
+                        console.error("Kesalahan koneksi supabaseClient saat update pembayaran:", err);
                         customModal("Peringatan", "Pelunasan disimpan lokal. Koneksi database terputus.", false, "OK");
                     }
                 }
@@ -1188,10 +1188,10 @@
                     tx.paidInDay = null; 
                     tx.paymentHistory = []; 
                     
-                    // Update ke Supabase
-                    if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                    // Update ke supabaseClient
+                    if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                         try {
-                            const { error } = await supabase
+                            const { error } = await supabaseClient
                                 .from('orders')
                                 .update({
                                     isPaid: false,
@@ -1203,10 +1203,10 @@
                                 .eq('id', tx.id);
                             
                             if (error) {
-                                console.error("Gagal update status batal lunas di Supabase:", error);
+                                console.error("Gagal update status batal lunas di supabaseClient:", error);
                             }
                         } catch (err) {
-                            console.error("Kesalahan koneksi Supabase saat update batal lunas:", err);
+                            console.error("Kesalahan koneksi supabaseClient saat update batal lunas:", err);
                         }
                     }
                     
@@ -1221,19 +1221,19 @@
             if (txIndex !== -1) {
                 orders[txIndex].status = newStatus;
                 
-                // Update ke Supabase
-                if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                // Update ke supabaseClient
+                if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                     try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                             .from('orders')
                             .update({ status: newStatus })
                             .eq('id', id);
                         
                         if (error) {
-                            console.error("Gagal update status pesanan di Supabase:", error);
+                            console.error("Gagal update status pesanan di supabaseClient:", error);
                         }
                     } catch (err) {
-                        console.error("Kesalahan koneksi Supabase saat update status pesanan:", err);
+                        console.error("Kesalahan koneksi supabaseClient saat update status pesanan:", err);
                     }
                 }
                 
@@ -1255,21 +1255,21 @@
             );
             
             if (confirm) {
-                // Delete dari Supabase
-                if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                // Delete dari supabaseClient
+                if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                     try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                             .from('orders')
                             .delete()
                             .eq('id', id);
                         
                         if (error) {
-                            console.error("Gagal menghapus nota dari Supabase:", error);
+                            console.error("Gagal menghapus nota dari supabaseClient:", error);
                             customModal("Error", "Gagal menghapus nota dari Cloud: " + error.message, false, "OK");
                             return;
                         }
                     } catch (err) {
-                        console.error("Kesalahan koneksi Supabase saat menghapus nota:", err);
+                        console.error("Kesalahan koneksi supabaseClient saat menghapus nota:", err);
                         customModal("Error", "Gagal menghapus nota, koneksi database terputus.", false, "OK");
                         return;
                     }
@@ -1522,21 +1522,21 @@
                 );
 
             if (isConfirmed) {
-                // Delete dari Supabase
-                if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                // Delete dari supabaseClient
+                if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
                     try {
-                        const { error } = await supabase
+                        const { error } = await supabaseClient
                             .from('orders')
                             .delete()
                             .eq('date', date);
                         
                         if (error) {
-                            console.error("Gagal menghapus riwayat hari di Supabase:", error);
+                            console.error("Gagal menghapus riwayat hari di supabaseClient:", error);
                             customModal("Error", "Gagal menghapus data dari Cloud: " + error.message, false, "OK");
                             return;
                         }
                     } catch (err) {
-                        console.error("Kesalahan koneksi Supabase saat menghapus riwayat hari:", err);
+                        console.error("Kesalahan koneksi supabaseClient saat menghapus riwayat hari:", err);
                         customModal("Error", "Gagal menghapus riwayat, koneksi database terputus.", false, "OK");
                         return;
                     }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Laundry Business Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabaseClient/supabaseClient-js@2"></script>
     <script src="config.js"></script>
     <style>
         :root { --primary: #2563eb; --expense: #dc2626; --profit: #16a34a; --bg: #f1f5f9; }
@@ -132,17 +132,17 @@
 <script>
     const MASTER_PASSWORD = "@Tomang155";
 
-    // Konfigurasi Supabase (Membaca dari config.js atau langsung di bawah ini)
+    // Konfigurasi supabaseClient (Membaca dari config.js atau langsung di bawah ini)
     const SUPABASE_URL = window.CONFIG_SUPABASE_URL || 'YOUR_SUPABASE_URL';
     const SUPABASE_ANON_KEY = window.CONFIG_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
     
-    let supabase = null;
+    let supabaseClient = null;
     try {
         if (window.supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY') {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
     } catch (e) {
-        console.error("Gagal menginisialisasi client Supabase di Analytics:", e);
+        console.error("Gagal menginisialisasi client supabaseClient di Analytics:", e);
     }
 
     async function checkPass() {
@@ -159,8 +159,8 @@
     }
 
     async function loadDataFromSupabase() {
-        if (!supabase || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
-            console.log("Supabase belum terkonfigurasi. Gunakan impor manual atau isi URL & KEY.");
+        if (!supabaseClient || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            console.log("supabaseClient belum terkonfigurasi. Gunakan impor manual atau isi URL & KEY.");
             // Load local expenses as fallback
             expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
             return;
@@ -168,25 +168,25 @@
         
         try {
             // Load orders
-            const { data: ordData, error: ordErr } = await supabase
+            const { data: ordData, error: ordErr } = await supabaseClient
                 .from('orders')
                 .select('*')
                 .order('id', { ascending: false });
             
             if (ordErr) {
-                console.error("Gagal mengambil data transaksi dari Supabase:", ordErr);
+                console.error("Gagal mengambil data transaksi dari supabaseClient:", ordErr);
             } else {
                 rawTransactions = ordData || [];
             }
             
             // Load expenses
-            const { data: expData, error: expErr } = await supabase
+            const { data: expData, error: expErr } = await supabaseClient
                 .from('expenses')
                 .select('*')
                 .order('date', { ascending: false });
             
             if (expErr) {
-                console.error("Gagal mengambil data pengeluaran dari Supabase:", expErr);
+                console.error("Gagal mengambil data pengeluaran dari supabaseClient:", expErr);
                 expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
             } else {
                 expenses = expData || [];
@@ -195,7 +195,7 @@
             document.getElementById('content').style.display = 'block';
             renderAll();
         } catch (err) {
-            console.error("Kesalahan koneksi database Supabase:", err);
+            console.error("Kesalahan koneksi database supabaseClient:", err);
             expenses = JSON.parse(localStorage.getItem('laundry_expenses')) || [];
         }
     }
@@ -229,15 +229,15 @@
         
         const newExpense = { date, cat, amount };
         
-        if (supabase && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        if (supabaseClient && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('expenses')
                     .insert([newExpense])
                     .select();
                 
                 if (error) {
-                    console.error("Gagal menyimpan pengeluaran ke Supabase:", error);
+                    console.error("Gagal menyimpan pengeluaran ke supabaseClient:", error);
                     alert("Gagal menyimpan ke Cloud, menyimpan ke lokal: " + error.message);
                     expenses.push(newExpense);
                 } else {
